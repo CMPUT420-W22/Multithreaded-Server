@@ -12,7 +12,15 @@ client: client.o
 client.o: client.c common.h
 	gcc -c -o client.o client.c
 
-test: 
+attacker: attacker.o
+	gcc -o attacker attacker.o -pthread -lm
+	
+attacker.o: attacker.c common.h
+	gcc -c -o attacker.o attacker.c 
 	
 clean: 
 	rm *.o
+	rm single
+	rm mult
+	rm client
+	rm server_output_time_aggregated
