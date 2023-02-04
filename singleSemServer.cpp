@@ -6,8 +6,10 @@
 #include<arpa/inet.h>
 #include<unistd.h>
 #include<pthread.h>
+#include<cstdint>
 #include<semaphore.h>
-
+#include<iostream>
+using namespace std;
 extern "C" {
     #include "common.h"
     #include "timer.h"
@@ -15,21 +17,27 @@ extern "C" {
 
 char **theArray;
 sem_t semaphore;
+double start_time;
+double end_time;
+double elapsed;
+double* times;
 
 void *ServerEcho(void *args)
 {
-    int clientFileDescriptor=(int)args;
+    int clientFileDescriptor=(intptr_t)args;
     char str[COM_BUFF_SIZE]; // array to hold client string
-    char dst[COM_BUFF_SIZE];
+    char dst[COM_BUFF_SIZE]; // destination array to put theArray string into
     read(clientFileDescriptor,str, COM_BUFF_SIZE); // read client string into str array
     printf("reading from client:%s\n",str);
 
     ClientRequest rqst;
+
     // Tokenize string data and set it to object attributes
     ParseMsg(str, &rqst); 
-
+    
     // CRITICAL SECTION
     sem_wait(&semaphore);
+    GET_TIME(start_time);
     if (rqst.is_read == 0){
         // Write case -> server will update corresponding string in array with new text supplied by client.
         // Server will then send the updated string from array to the client
@@ -37,11 +45,11 @@ void *ServerEcho(void *args)
     }
     // Read case -> server will just send back the corresponding string to the client
     getContent(dst, rqst.pos, theArray);
-
+    GET_TIME(end_time);
     sem_post(&semaphore);
+    // END CRITICAL SECTION
 
-
-    write(clientFileDescriptor,str,20);
+    write(clientFileDescriptor,str,COM_BUFF_SIZE);
     close(clientFileDescriptor);
     return NULL;
 }
@@ -57,8 +65,11 @@ int main(int argc, char* argv[])
 
     //allocating "n" amount of space for theArray
     //https://stackoverflow.com/questions/4316987/define-the-size-of-a-global-array-from-the-command-line
-    int elements = atoi (argv [1]);
-    theArray = (char**)malloc (elements * sizeof (theArray[0]));
+    int elements = atoi(argv[1]);
+    theArray = (char**)malloc (elements * sizeof(theArray[0]));
+    for (int i = 0; i < elements; i++){
+        theArray[i] = (char*)malloc(COM_BUFF_SIZE * sizeof(char));
+    }
 
     // changed socket commands to implement command line arguments
     sock_var.sin_addr.s_addr=inet_addr(argv[2]); 
@@ -87,5 +98,10 @@ int main(int argc, char* argv[])
     else{
         printf("socket creation failed\n");
     }
+
+    for (int i = 0; i < elements; i++){
+        free(theArray[i]);
+    }
+    free(theArray);
     return 0;
 }
