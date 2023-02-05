@@ -106,10 +106,11 @@ int main(int argc, char* argv[])
     }
     //free allocated space
     saveTimes(timeptr, COM_NUM_REQUEST);
-    for (int i = 0; i < 15; i++){
+    for (int i = 0; i < elements; i++){
         free(theArray[i]); 
     }
     free(theArray);
+    pthread_mutex_destroy(&mutex);
 
     return 0;
 }
