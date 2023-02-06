@@ -16,11 +16,15 @@ extern "C" {
 }
 
 char **theArray;
-sem_t semaphore;
-double start_time;
-double end_time;
-double elapsed;
-double* times;
+
+double timeStart;
+double timeEnd;
+double timeList[COM_NUM_REQUEST] = {0};
+double* timeptr = &timeList[0];  
+int request = 0;
+
+pthread_rwlock_t readlock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t writelock = PTHREAD_RWLOCK_INITIALIZER;
 
 void *ServerEcho(void *args)
 {
@@ -36,22 +40,44 @@ void *ServerEcho(void *args)
     ParseMsg(str, &rqst); 
     
     // CRITICAL SECTION
-    sem_wait(&semaphore);
-    GET_TIME(start_time);
+
+    //GET_TIME(start_time);
     if (rqst.is_read == 0){
+        
         // Write case -> server will update corresponding string in array with new text supplied by client.
+        pthread_rwlock_wrlock(&writelock); // Write lock -> no other threads may write to the array
+        GET_TIME(timeStart);
         // Server will then send the updated string from array to the client
         setContent(str, rqst.pos, theArray);
+
+        pthread_rwlock_unlock(&writelock);
+
+        pthread_rwlock_rdlock(&readlock); // Read lock -> no other threads here may read from the array
+
+        getContent(dst, rqst.pos, theArray);
+
+        GET_TIME(timeEnd);
+        timeList[request] = timeEnd - timeStart;
+        request++;
+        pthread_rwlock_unlock(&readlock);
+    } else if (rqst.is_read == 1){
+
+        // Read case -> server will just send back the corresponding string to the client
+        pthread_rwlock_rdlock(&readlock); // Read lock -> no other threads here may read from the array
+        GET_TIME(timeStart);
+        getContent(dst, rqst.pos, theArray);
+        GET_TIME(timeEnd);
+        timeList[request] = timeEnd - timeStart;
+        request++;
+        pthread_rwlock_unlock(&readlock);
+
     }
-    // Read case -> server will just send back the corresponding string to the client
-    getContent(dst, rqst.pos, theArray);
-    GET_TIME(end_time);
-    sem_post(&semaphore);
+
+
     // END CRITICAL SECTION
 
     write(clientFileDescriptor,str,COM_BUFF_SIZE);
-    elapsed = end_time - start_time;
-    saveTimes(times, elapsed);
+
     close(clientFileDescriptor);
     return NULL;
 }
@@ -78,8 +104,6 @@ int main(int argc, char* argv[])
     sock_var.sin_port= atoi(argv[3]);
     sock_var.sin_family=AF_INET;
 
-    // Initialize our semaphore
-    sem_init(&semaphore, 0, 1);
 
     if(bind(serverFileDescriptor,(struct sockaddr*)&sock_var,sizeof(sock_var))>=0)
     {
@@ -100,7 +124,7 @@ int main(int argc, char* argv[])
     else{
         printf("socket creation failed\n");
     }
-
+    saveTimes(timeptr, COM_NUM_REQUEST);
     for (int i = 0; i < elements; i++){
         free(theArray[i]);
     }
