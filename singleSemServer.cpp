@@ -50,6 +50,8 @@ void *ServerEcho(void *args)
     // END CRITICAL SECTION
 
     write(clientFileDescriptor,str,COM_BUFF_SIZE);
+    elapsed = end_time - start_time;
+    saveTimes(times, elapsed);
     close(clientFileDescriptor);
     return NULL;
 }
