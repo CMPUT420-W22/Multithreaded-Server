@@ -15,8 +15,9 @@ extern "C" {
     #include "timer.h"
 }
 
-char **theArray;
+// Initialize global variables
 
+char **theArray;
 double timeStart;
 double timeEnd;
 double timeList[COM_NUM_REQUEST] = {0};
@@ -30,7 +31,7 @@ void *ServerEcho(void *args)
 {
     int clientFileDescriptor=(intptr_t)args;
     char str[COM_BUFF_SIZE]; // array to hold client string
-    char dst[COM_BUFF_SIZE];
+    char dst[COM_BUFF_SIZE]; // array to hold string to send to client
     read(clientFileDescriptor,str, COM_BUFF_SIZE); // read client string into str array
     printf("reading from client:%s\n",str);
 
@@ -39,64 +40,76 @@ void *ServerEcho(void *args)
     // Tokenize string data and set it to object attributes
     ParseMsg(str, &rqst); 
     
-    // CRITICAL SECTION
-
     if (rqst.is_read == 0){
         // Write case -> server will update corresponding string in array with new text supplied by client.
-
         GET_TIME(timeStart);
 
-        pthread_rwlock_wrlock(&readwritelock[rqst.pos]); // Write lock -> no other threads may write to the array
+        // Write lock -> no other threads may write to the array element
+        pthread_rwlock_wrlock(&readwritelock[rqst.pos]); 
   
-        // Server will then send the updated string from array to the client
+        // Set the element in the array to the string
         setContent(rqst.msg, rqst.pos, theArray);
+        // Get the message to send back
         getContent(str, rqst.pos, theArray);
+        // Remove the write lock from this array element
         pthread_rwlock_unlock(&readwritelock[rqst.pos]);
+
         GET_TIME(timeEnd);
-        if (write(clientFileDescriptor,str,COM_BUFF_SIZE) < 0){
-            cout << "server write error" << endl;
-        }
+
+        // Write the string to the client fd
+        write(clientFileDescriptor,str,COM_BUFF_SIZE);
 
     } else {
-        GET_TIME(timeStart);
         // Read case -> server will just send back the corresponding string to the client
         // Blocks if a thread holds the lock for writing and no threads are waiting on the lock
-        pthread_rwlock_rdlock(&readwritelock[rqst.pos]);  // Read lock -> no other threads here may read from the array
+        GET_TIME(timeStart);
 
-        getContent(dst, rqst.pos, theArray); // save string in position 'pos' from theArray to dst
+        // Read lock -> no other threads here may read from this array element
+        pthread_rwlock_rdlock(&readwritelock[rqst.pos]);  
+        // save string in position 'pos' from theArray to dst[]
+        getContent(dst, rqst.pos, theArray); 
+        // Remove the readlock from this array element
         pthread_rwlock_unlock(&readwritelock[rqst.pos]);
 
         GET_TIME(timeEnd);
-        if (write(clientFileDescriptor,dst,COM_BUFF_SIZE) < 0){
-            cout << "server read error" << endl;
-        }
+
+        // Write the string to the client fd
+        write(clientFileDescriptor,dst,COM_BUFF_SIZE);
 
     }
 
+    // Lock the index so we can save the time to the correct array index
     pthread_mutex_lock(&indexlock);
     timeList[request] = timeEnd - timeStart;
     request++;
     pthread_mutex_unlock(&indexlock);
-    // END CRITICAL SECTION
+
     close(clientFileDescriptor);
+
     return NULL;
 }
 
-// size of string array, server ip, server port
 int main(int argc, char* argv[])
 {
     struct sockaddr_in sock_var;
     int serverFileDescriptor=socket(AF_INET,SOCK_STREAM,0);
     int clientFileDescriptor;
     int i;
+
+    // Array of threads to hold COM_NUM_REQUEST threads
     pthread_t t[COM_NUM_REQUEST];
+
+    int elements = atoi(argv[1]);
+
+    // Allocate space for the array of strings
+    theArray = (char**)malloc (elements * sizeof(theArray[0]));
+    // Allocate space for the array of rwlocks
+    readwritelock = (pthread_rwlock_t*)malloc(elements * sizeof(pthread_rwlock_t));
 
     //allocating "n" amount of space for theArray
     //https://stackoverflow.com/questions/4316987/define-the-size-of-a-global-array-from-the-command-line
-    int elements = atoi(argv[1]);
-    theArray = (char**)malloc (elements * sizeof(theArray[0]));
-    readwritelock = (pthread_rwlock_t*)malloc(elements * sizeof(pthread_rwlock_t));
     for (int i = 0; i < elements; i++){
+        // Allocate space for the individual elements
         theArray[i] = (char*)malloc(COM_BUFF_SIZE * sizeof(char));
         pthread_rwlock_init(&readwritelock[i],NULL);
     }
@@ -110,11 +123,11 @@ int main(int argc, char* argv[])
     if(bind(serverFileDescriptor,(struct sockaddr*)&sock_var,sizeof(sock_var))>=0)
     {
         printf("socket has been created\n");
-        listen(serverFileDescriptor, COM_NUM_REQUEST); //changed '2000' to COM_NUM_REQUEST
+        listen(serverFileDescriptor, COM_NUM_REQUEST); 
 
-        while(1)        //loop infinity, wait for client connections
+        while(1)       
         {
-            for(i=0;i<COM_NUM_REQUEST;i++)      //change '20' to COM_NUM_REQUEST support 20 clients at a time
+            for(i=0;i<COM_NUM_REQUEST;i++) // Loop for COM_NUM_REQUEST threads
             {
                 clientFileDescriptor=accept(serverFileDescriptor,NULL,NULL);
                 printf("Connected to client %d\n",clientFileDescriptor);
@@ -123,6 +136,7 @@ int main(int argc, char* argv[])
             for (i=0; i<COM_NUM_REQUEST; i++){
                 pthread_join(t[i], NULL);
             }
+            // Save the average memory access latency to process 1000 requests
             saveTimes(timeptr, COM_NUM_REQUEST);
 
         }
@@ -131,6 +145,7 @@ int main(int argc, char* argv[])
     else{
         printf("socket creation failed\n");
     }
+    // Free the allocated space
     for (int i = 0; i < elements; i++){
         free(theArray[i]);
         pthread_rwlock_destroy(&readwritelock[i]);
