@@ -23,14 +23,12 @@ double timeList[COM_NUM_REQUEST] = {0};
 double* timeptr = &timeList[0];  
 int request = 0;
 
-pthread_rwlock_t readlock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t writelock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t readwritelock;
 
 void *ServerEcho(void *args)
 {
     int clientFileDescriptor=(intptr_t)args;
     char str[COM_BUFF_SIZE]; // array to hold client string
-    char dst[COM_BUFF_SIZE]; // destination array to put theArray string into
     read(clientFileDescriptor,str, COM_BUFF_SIZE); // read client string into str array
     printf("reading from client:%s\n",str);
 
@@ -45,39 +43,36 @@ void *ServerEcho(void *args)
     if (rqst.is_read == 0){
         
         // Write case -> server will update corresponding string in array with new text supplied by client.
-        pthread_rwlock_wrlock(&writelock); // Write lock -> no other threads may write to the array
+        pthread_rwlock_wrlock(&readwritelock); // Write lock -> no other threads may write to the array
         GET_TIME(timeStart);
         // Server will then send the updated string from array to the client
         setContent(str, rqst.pos, theArray);
 
-        pthread_rwlock_unlock(&writelock);
+        pthread_rwlock_unlock(&readwritelock);
 
-        pthread_rwlock_rdlock(&readlock); // Read lock -> no other threads here may read from the array
+        pthread_rwlock_rdlock(&readwritelock); // Read lock -> no other threads here may read from the array
 
-        getContent(dst, rqst.pos, theArray);
+        getContent(str, rqst.pos, theArray);
 
         GET_TIME(timeEnd);
         timeList[request] = timeEnd - timeStart;
         request++;
-        pthread_rwlock_unlock(&readlock);
+        pthread_rwlock_unlock(&readwritelock);
     } else if (rqst.is_read == 1){
 
         // Read case -> server will just send back the corresponding string to the client
-        pthread_rwlock_rdlock(&readlock); // Read lock -> no other threads here may read from the array
+        pthread_rwlock_rdlock(&readwritelock); // Read lock -> no other threads here may read from the array
         GET_TIME(timeStart);
-        getContent(dst, rqst.pos, theArray);
+        getContent(str, rqst.pos, theArray);
         GET_TIME(timeEnd);
         timeList[request] = timeEnd - timeStart;
         request++;
-        pthread_rwlock_unlock(&readlock);
-
+        pthread_rwlock_unlock(&readwritelock);
     }
-
 
     // END CRITICAL SECTION
 
     write(clientFileDescriptor,str,COM_BUFF_SIZE);
-
     close(clientFileDescriptor);
     return NULL;
 }
@@ -89,7 +84,8 @@ int main(int argc, char* argv[])
     int serverFileDescriptor=socket(AF_INET,SOCK_STREAM,0);
     int clientFileDescriptor;
     int i;
-    pthread_t t[20];
+    pthread_t t[COM_NUM_REQUEST];
+    pthread_rwlock_init(&readwritelock,NULL);
 
     //allocating "n" amount of space for theArray
     //https://stackoverflow.com/questions/4316987/define-the-size-of-a-global-array-from-the-command-line
@@ -100,7 +96,7 @@ int main(int argc, char* argv[])
     }
 
     // changed socket commands to implement command line arguments
-    sock_var.sin_addr.s_addr=inet_addr(argv[2]); 
+    sock_var.sin_addr.s_addr=inet_addr(argv[2]);
     sock_var.sin_port= atoi(argv[3]);
     sock_var.sin_family=AF_INET;
 
@@ -112,22 +108,27 @@ int main(int argc, char* argv[])
 
         while(1)        //loop infinity, wait for client connections
         {
-            for(i=0;i<20;i++)      //can support 20 clients at a time
+            for(i=0;i<COM_NUM_REQUEST;i++)      //change '20' to COM_NUM_REQUEST support 20 clients at a time
             {
                 clientFileDescriptor=accept(serverFileDescriptor,NULL,NULL);
                 printf("Connected to client %d\n",clientFileDescriptor);
                 pthread_create(&t[i],NULL,ServerEcho,(void *)(long)clientFileDescriptor);
             }
+            for (i=0; i<COM_NUM_REQUEST; i++){
+                pthread_join(t[i], NULL);
+            }
+            saveTimes(timeptr, COM_NUM_REQUEST);
+
         }
         close(serverFileDescriptor);
     }
     else{
         printf("socket creation failed\n");
     }
-    saveTimes(timeptr, COM_NUM_REQUEST);
     for (int i = 0; i < elements; i++){
         free(theArray[i]);
     }
     free(theArray);
+    pthread_rwlock_destroy(&readwritelock);
     return 0;
 }

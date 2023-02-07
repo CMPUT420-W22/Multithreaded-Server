@@ -6,6 +6,12 @@ singleMutexServer: singleMutexServer.o
 singleMutexServer.o: singleMutexServer.cpp timer.h common.h
 	g++ -c -o singleMutexServer.o singleMutexServer.cpp
 
+singleReadServer: singleReadServer.o
+	g++ -o singleReadServer singleReadServer.o -pthread
+	
+singleReadServer.o: singleReadServer.cpp timer.h common.h
+	g++ -c -o singleReadServer.o singleReadServer.cpp
+
 multMutexServer: multMutexServer.o
 	g++ -o multMutexServer multMutexServer.o -pthread
 	
