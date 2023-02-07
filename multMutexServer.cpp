@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
             {
                 pthread_join(t[i], NULL);
             }
+            saveTimes(timeptr, COM_NUM_REQUEST);
+
         }
 
         close(serverFileDescriptor);
@@ -112,7 +114,6 @@ int main(int argc, char *argv[])
         printf("socket creation failed\n");
     }
     // free allocated space
-    saveTimes(timeptr, COM_NUM_REQUEST);
     for (int i = 0; i < elements; i++)
     {
         free(theArray[i]);

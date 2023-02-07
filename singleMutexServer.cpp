@@ -96,7 +96,8 @@ int main(int argc, char* argv[])
             for(i=0;i<COM_NUM_REQUEST;i++)      //can support 20 clients at a time
             {
                 pthread_join(t[i], NULL);
-            } 
+            }
+            saveTimes(timeptr, COM_NUM_REQUEST); 
         }
 
         close(serverFileDescriptor);
@@ -105,7 +106,7 @@ int main(int argc, char* argv[])
         printf("socket creation failed\n");
     }
     //free allocated space
-    saveTimes(timeptr, COM_NUM_REQUEST);
+    
     for (int i = 0; i < elements; i++){
         free(theArray[i]); 
     }
