@@ -24,11 +24,13 @@ double* timeptr = &timeList[0];
 int request = 0;
 
 pthread_rwlock_t readwritelock;
+pthread_mutex_t indexlock = PTHREAD_MUTEX_INITIALIZER;
 
 void *ServerEcho(void *args)
 {
     int clientFileDescriptor=(intptr_t)args;
     char str[COM_BUFF_SIZE]; // array to hold client string
+    char dst[COM_BUFF_SIZE];
     read(clientFileDescriptor,str, COM_BUFF_SIZE); // read client string into str array
     printf("reading from client:%s\n",str);
 
@@ -39,40 +41,43 @@ void *ServerEcho(void *args)
     
     // CRITICAL SECTION
 
-    //GET_TIME(start_time);
     if (rqst.is_read == 0){
-        
         // Write case -> server will update corresponding string in array with new text supplied by client.
+
+        GET_TIME(timeStart);
+
         pthread_rwlock_wrlock(&readwritelock); // Write lock -> no other threads may write to the array
-        GET_TIME(timeStart);
+  
         // Server will then send the updated string from array to the client
-        setContent(str, rqst.pos, theArray);
-
-        pthread_rwlock_unlock(&readwritelock);
-
-        pthread_rwlock_rdlock(&readwritelock); // Read lock -> no other threads here may read from the array
-
+        setContent(rqst.msg, rqst.pos, theArray);
         getContent(str, rqst.pos, theArray);
-
-        GET_TIME(timeEnd);
-        timeList[request] = timeEnd - timeStart;
-        request++;
         pthread_rwlock_unlock(&readwritelock);
-    } else if (rqst.is_read == 1){
+        GET_TIME(timeEnd);
+        if (write(clientFileDescriptor,str,COM_BUFF_SIZE) < 0){
+            cout << "server write error" << endl;
+        }
 
-        // Read case -> server will just send back the corresponding string to the client
-        pthread_rwlock_rdlock(&readwritelock); // Read lock -> no other threads here may read from the array
+    } else {
         GET_TIME(timeStart);
-        getContent(str, rqst.pos, theArray);
-        GET_TIME(timeEnd);
-        timeList[request] = timeEnd - timeStart;
-        request++;
+        // Read case -> server will just send back the corresponding string to the client
+        // Blocks if a thread holds the lock for writing and no threads are waiting on the lock
+        pthread_rwlock_rdlock(&readwritelock);  // Read lock -> no other threads here may read from the array
+
+        getContent(dst, rqst.pos, theArray); // save string in position 'pos' from theArray to dst
         pthread_rwlock_unlock(&readwritelock);
+
+        GET_TIME(timeEnd);
+        if (write(clientFileDescriptor,dst,COM_BUFF_SIZE) < 0){
+            cout << "server read error" << endl;
+        }
+
     }
 
+    pthread_mutex_lock(&indexlock);
+    timeList[request] = timeEnd - timeStart;
+    request++;
+    pthread_mutex_unlock(&indexlock);
     // END CRITICAL SECTION
-
-    write(clientFileDescriptor,str,COM_BUFF_SIZE);
     close(clientFileDescriptor);
     return NULL;
 }
