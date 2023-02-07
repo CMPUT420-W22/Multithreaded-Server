@@ -12,6 +12,12 @@ singleReadServer: singleReadServer.o
 singleReadServer.o: singleReadServer.cpp timer.h common.h
 	g++ -c -o singleReadServer.o singleReadServer.cpp
 
+multReadServer: multReadServer.o
+	g++ -o multReadServer multReadServer.o -pthread
+	
+multReadServer.o: multReadServer.cpp timer.h common.h
+	g++ -c -o multReadServer.o multReadServer.cpp	
+
 multMutexServer: multMutexServer.o
 	g++ -o multMutexServer multMutexServer.o -pthread
 	
@@ -32,7 +38,10 @@ attacker.o: attacker.c common.h
 	
 clean: 
 	rm *.o
-	rm single
-	rm mult
+	rm singleMutexServer
+	rm multMutexServer
+	rm singleReadServer
+	rm multReadServer
+	rm attacker
 	rm client
 	rm server_output_time_aggregated
