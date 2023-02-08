@@ -6,7 +6,7 @@
 #include<arpa/inet.h>
 #include<unistd.h>
 #include<pthread.h>
-#include<cstdint>
+#include<stdint.h>
 #include<semaphore.h>
 #include<iostream>
 using namespace std;
