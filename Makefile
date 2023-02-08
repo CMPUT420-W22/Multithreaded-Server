@@ -1,4 +1,4 @@
-all: 
+all: singleMutexServer singleReadServer multMutexServer multReadServer client attacker
 
 singleMutexServer: singleMutexServer.o
 	g++ -o singleMutexServer singleMutexServer.o -pthread
