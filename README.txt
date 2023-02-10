@@ -8,11 +8,11 @@ These are made from our various server code. Then you may run each one seperatel
 
 main1: uses a single mutex to protect theArray.
 
-main2: uses a multiple mutex to protect theArray.
+main2: uses a single read-write to protect theArray.
 
-main3: uses a single read-write lock to protect theArray.
+main3: uses multiple read-write locks to protect theArray.
 
-main4: uses a multiple read-write lock to protect theArray.
+main4: uses multiple mutexes to protect theArray.
 
 For example: 
 
