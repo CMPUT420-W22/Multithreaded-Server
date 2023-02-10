@@ -1,25 +1,25 @@
-all: singleMutexServer singleReadServer multMutexServer multReadServer client attacker
+all: main1 main2 main3 main4 client attacker
 
-singleMutexServer: singleMutexServer.o
-	g++ -o singleMutexServer singleMutexServer.o -pthread
+main1: singleMutexServer.o
+	g++ -o main1 singleMutexServer.o -pthread
 	
 singleMutexServer.o: singleMutexServer.cpp timer.h common.h
 	g++ -c -o singleMutexServer.o singleMutexServer.cpp
 
-singleReadServer: singleReadServer.o
-	g++ -o singleReadServer singleReadServer.o -pthread
+main2: singleReadServer.o
+	g++ -o main2 singleReadServer.o -pthread
 	
 singleReadServer.o: singleReadServer.cpp timer.h common.h
 	g++ -c -o singleReadServer.o singleReadServer.cpp
 
-multReadServer: multReadServer.o
-	g++ -o multReadServer multReadServer.o -pthread
+main3: multReadServer.o
+	g++ -o main3 multReadServer.o -pthread
 	
 multReadServer.o: multReadServer.cpp timer.h common.h
 	g++ -c -o multReadServer.o multReadServer.cpp	
 
-multMutexServer: multMutexServer.o
-	g++ -o multMutexServer multMutexServer.o -pthread
+main4: multMutexServer.o
+	g++ -o main4 multMutexServer.o -pthread
 	
 multMutexServer.o: multMutexServer.cpp timer.h common.h
 	g++ -c -o multMutexServer.o multMutexServer.cpp	
@@ -38,10 +38,10 @@ attacker.o: attacker.c common.h
 	
 clean: 
 	rm *.o
-	rm singleMutexServer
-	rm multMutexServer
-	rm singleReadServer
-	rm multReadServer
+	rm main1
+	rm main2
+	rm main3
+	rm main4
 	rm attacker
 	rm client
 	rm server_output_time_aggregated
