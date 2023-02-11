@@ -42,19 +42,19 @@ void *ServerEcho(void *args)
     
     if (rqst.is_read == 0){
         // Write case -> server will update corresponding string in array with new text supplied by client.
-        GET_TIME(timeStart);
 
         // Write lock -> no other threads may write to the array element
         pthread_rwlock_wrlock(&readwritelock[rqst.pos]); 
-  
+        GET_TIME(timeStart);
+
         // Set the element in the array to the string
         setContent(rqst.msg, rqst.pos, theArray);
         // Get the message to send back
         getContent(str, rqst.pos, theArray);
         // Remove the write lock from this array element
+        GET_TIME(timeEnd);
         pthread_rwlock_unlock(&readwritelock[rqst.pos]);
 
-        GET_TIME(timeEnd);
 
         // Write the string to the client fd
         write(clientFileDescriptor,str,COM_BUFF_SIZE);
@@ -62,16 +62,17 @@ void *ServerEcho(void *args)
     } else {
         // Read case -> server will just send back the corresponding string to the client
         // Blocks if a thread holds the lock for writing and no threads are waiting on the lock
-        GET_TIME(timeStart);
 
         // Read lock -> no other threads here may read from this array element
         pthread_rwlock_rdlock(&readwritelock[rqst.pos]);  
+        GET_TIME(timeStart);
         // save string in position 'pos' from theArray to dst[]
         getContent(dst, rqst.pos, theArray); 
         // Remove the readlock from this array element
+        GET_TIME(timeEnd);
         pthread_rwlock_unlock(&readwritelock[rqst.pos]);
 
-        GET_TIME(timeEnd);
+
 
         // Write the string to the client fd
         write(clientFileDescriptor,dst,COM_BUFF_SIZE);
