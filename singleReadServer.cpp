@@ -56,13 +56,15 @@ void *ServerEcho(void *args)
     } else {
         // Read case -> server will just send back the corresponding string to the client
         // Blocks if a thread holds the lock for writing and no threads are waiting on the lock
-        GET_TIME(timeStart);
+
         // Read lock -> no other threads here may read from the array
         pthread_rwlock_rdlock(&readwritelock); 
+        GET_TIME(timeStart);
         getContent(dst, rqst.pos, theArray); // save string in position 'pos' from theArray to dst
         // Remove the read lock
-        pthread_rwlock_unlock(&readwritelock);
         GET_TIME(timeEnd);
+        pthread_rwlock_unlock(&readwritelock);
+
         // Write the string to the client fd
         write(clientFileDescriptor,dst,COM_BUFF_SIZE);
     }
